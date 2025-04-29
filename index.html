@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Aim Training Tool</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        #stats {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 5px;
+        }
+        #controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 5px;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            background: #444;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover {
+            background: #666;
+        }
+    </style>
+</head>
+<body>
+<div id="gameContainer">
+    <canvas id="gameCanvas"></canvas>
+    <div id="stats">
+        <div>Score: <span id="score">0</span></div>
+        <div>Time: <span id="timer">60</span>s</div>
+        <div>Accuracy: <span id="accuracy">100</span>%</div>
+    </div>
+    <div id="controls">
+        <button onclick="setDifficulty('easy')">Easy</button>
+        <button onclick="setDifficulty('medium')">Medium</button>
+        <button onclick="setDifficulty('hard')">Hard</button>
+        <button onclick="startGame()">Restart</button>
+    </div>
+</div>
+
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  let targets = [];
+  let score = 0;
+  let totalShots = 0;
+  let hits = 0;
+  let gameTime = 60;
+  let isGameActive = false;
+  let difficulty = 'medium';
+
+  // 调整游戏参数
+  const difficultySettings = {
+    easy: { spawnInterval: 1500, targetSize: 40 },
+    medium: { spawnInterval: 1000, targetSize: 30 },
+    hard: { spawnInterval: 700, targetSize: 20 }
+  };
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  function createTarget() {
+    return {
+      x: Math.random() * (canvas.width - 50) + 25,
+      y: Math.random() * (canvas.height - 50) + 25,
+      size: difficultySettings[difficulty].targetSize,
+      createdAt: Date.now(),
+      active: true
+    };
+  }
+
+  function drawTarget(target) {
+    ctx.beginPath();
+    ctx.arc(target.x, target.y, target.size/2, 0, Math.PI * 2);
+    ctx.fillStyle = target.active ? '#ff4444' : '#44ff44';
+    ctx.fill();
+    ctx.closePath();
+  }
+
+  function updateGame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 生成新目标
+    if (Date.now() - lastSpawn > difficultySettings[difficulty].spawnInterval) {
+      targets.push(createTarget());
+      lastSpawn = Date.now();
+    }
+
+    // 更新和绘制目标
+    targets.forEach((target, index) => {
+      if (target.active) {
+        // 目标自动消失逻辑
+        if (Date.now() - target.createdAt > 2000) {
+          target.active = false;
+          score = Math.max(0, score - 10);
+        }
+      }
+      drawTarget(target);
+    });
+
+    // 更新显示数据
+    document.getElementById('score').textContent = score;
+    document.getElementById('accuracy').textContent =
+      hits === 0 ? 0 : Math.round((hits / totalShots) * 100);
+
+    if (isGameActive) {
+      requestAnimationFrame(updateGame);
+    }
+  }
+
+  function handleClick(e) {
+    if (!isGameActive) return;
+
+    totalShots++;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    targets.forEach((target, index) => {
+      if (target.active) {
+        const distance = Math.sqrt(
+          Math.pow(mouseX - target.x, 2) +
+          Math.pow(mouseY - target.y, 2)
+        );
+
+        if (distance < target.size/2) {
+          hits++;
+          score += 10;
+          targets.splice(index, 1);
+        }
+      }
+    });
+  }
+
+  function setDifficulty(level) {
+    difficulty = level;
+    targets = [];
+    startGame()
+  }
+
+  function startGame() {
+    // 重置游戏状态
+    score = 0;
+    totalShots = 0;
+    hits = 0;
+    targets = [];
+    isGameActive = true;
+    lastSpawn = Date.now();
+
+    // 重置计时器
+    gameTime = 60;
+    const timerElement = document.getElementById('timer');
+    const timer = setInterval(() => {
+      gameTime--;
+      timerElement.textContent = gameTime;
+      if (gameTime <= 0) {
+        isGameActive = false;
+        clearInterval(timer);
+        showFinalStats();
+      }
+    }, 1000);
+
+    updateGame();
+  }
+
+  function showFinalStats() {
+    const accuracy = hits === 0 ? 0 : Math.round((hits / totalShots) * 100);
+    alert(`Game Over!\nFinal Score: ${score}\nAccuracy: ${accuracy}%\nTotal Shots: ${totalShots}`);
+  }
+
+  // 初始化
+  window.addEventListener('resize', resizeCanvas);
+  canvas.addEventListener('click', handleClick);
+  resizeCanvas();
+</script>
+</body>
+</html>
